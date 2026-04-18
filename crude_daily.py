@@ -18,14 +18,11 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     daily = yf.download(ticker, period="3mo", interval="1d", progress=False, auto_adjust=False)
     if daily.empty:
         raise ValueError("No daily data available")
-
     if isinstance(daily.columns, pd.MultiIndex):
         daily.columns = daily.columns.get_level_values(0)
-
     daily = daily.dropna().copy()
     if isinstance(daily["Close"], pd.DataFrame):
         daily["Close"] = daily["Close"].iloc[:, 0]
-
     daily = daily.tail(daily_days).copy()
     daily["Moving Average"] = daily["Close"].rolling(ma_window).mean()
     daily["Label"] = pd.to_datetime(daily.index).strftime("%Y-%m-%d")
@@ -64,14 +61,11 @@ def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_wi
     intra = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
     if intra.empty:
         raise ValueError("No intraday data available")
-
     if isinstance(intra.columns, pd.MultiIndex):
         intra.columns = intra.columns.get_level_values(0)
-
     intra = intra.dropna().copy()
     if isinstance(intra["Close"], pd.DataFrame):
         intra["Close"] = intra["Close"].iloc[:, 0]
-
     intra["Moving Average"] = intra["Close"].rolling(ma_window).mean()
     intra = intra.tail(20).copy()
     intra["Label"] = pd.to_datetime(intra.index).strftime("%Y-%m-%d %H:%M")
@@ -131,9 +125,7 @@ def main():
     latest_date, latest_price, csv_path, daily_png = save_daily_chart(run_ts)
     intra_png = save_intraday_chart(run_ts)
     now_text = latest_date.strftime("%Y-%m-%d %H:%M")
-    subject = "Brent update"
-    body = f"aggiornamento brent / {now_text}"
-    send_email(subject, body, [daily_png, intra_png])
+    send_email("Brent update", f"aggiornamento brent / {now_text}", [daily_png, intra_png])
     print(f"Sent email with latest close {latest_price:.2f} USD/barrel")
     print(f"Saved: {csv_path}")
     print(f"Saved: {daily_png}")
