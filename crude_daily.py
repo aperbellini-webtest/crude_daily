@@ -18,11 +18,14 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     daily = yf.download(ticker, period="3mo", interval="1d", progress=False, auto_adjust=False)
     if daily.empty:
         raise ValueError("No daily data available")
+
     if isinstance(daily.columns, pd.MultiIndex):
         daily.columns = daily.columns.get_level_values(0)
+
     daily = daily.dropna().copy()
     if isinstance(daily["Close"], pd.DataFrame):
         daily["Close"] = daily["Close"].iloc[:, 0]
+
     daily = daily.tail(daily_days).copy()
     daily["Moving Average"] = daily["Close"].rolling(ma_window).mean()
     daily["Label"] = pd.to_datetime(daily.index).strftime("%Y-%m-%d")
@@ -30,10 +33,21 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     latest_price = float(daily["Close"].iloc[-1])
     latest_date = pd.to_datetime(daily.index[-1])
 
-    csv_path = BASE_DIR / f"crude_daily_data_{run_ts}.csv"
+    history_csv_path = BASE_DIR / "crude_daily_history.csv"
     png_path = BASE_DIR / f"crude_daily_daily_{run_ts}.png"
 
-    daily[["Close", "Moving Average"]].to_csv(csv_path, index_label="Date")
+    daily_export = daily.reset_index()[["Date", "Close", "Moving Average"]].copy()
+    daily_export["RunTimestamp"] = run_ts
+    daily_export["Ticker"] = ticker
+
+    if history_csv_path.exists():
+        old_history = pd.read_csv(history_csv_path)
+        combined = pd.concat([old_history, daily_export], ignore_index=True)
+        combined = combined.drop_duplicates(subset=["Date", "Ticker"], keep="last").sort_values("Date")
+    else:
+        combined = daily_export
+
+    combined.to_csv(history_csv_path, index=False)
 
     x = range(len(daily))
     fig, ax = plt.subplots(figsize=(15, 7))
@@ -55,17 +69,20 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     fig.savefig(png_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
-    return latest_date, latest_price, csv_path, png_path
+    return latest_date, latest_price, history_csv_path, png_path
 
 def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_window=5):
     intra = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
     if intra.empty:
         raise ValueError("No intraday data available")
+
     if isinstance(intra.columns, pd.MultiIndex):
         intra.columns = intra.columns.get_level_values(0)
+
     intra = intra.dropna().copy()
     if isinstance(intra["Close"], pd.DataFrame):
         intra["Close"] = intra["Close"].iloc[:, 0]
+
     intra["Moving Average"] = intra["Close"].rolling(ma_window).mean()
     intra = intra.tail(20).copy()
     intra["Label"] = pd.to_datetime(intra.index).strftime("%Y-%m-%d %H:%M")
@@ -122,12 +139,13 @@ def send_email(subject, body, attachments):
 
 def main():
     run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    latest_date, latest_price, csv_path, daily_png = save_daily_chart(run_ts)
+    latest_date, latest_price, history_csv, daily_png = save_daily_chart(run_ts)
     intra_png = save_intraday_chart(run_ts)
     now_text = latest_date.strftime("%Y-%m-%d %H:%M")
-    send_email("Brent update", f"aggiornamento brent / {now_text}", [daily_png, intra_png])
+    body = f"aggiornamento brent / {now_text}"
+    send_email("Brent update", body, [daily_png, intra_png, history_csv])
     print(f"Sent email with latest close {latest_price:.2f} USD/barrel")
-    print(f"Saved: {csv_path}")
+    print(f"Saved: {history_csv}")
     print(f"Saved: {daily_png}")
     print(f"Saved: {intra_png}")
 
