@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 BASE_DIR = Path.cwd()
 
-def save_daily_chart(ticker="BZ=F", daily_days=20, ma_window=5):
+def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     daily = yf.download(ticker, period="3mo", interval="1d", progress=False, auto_adjust=False)
     if daily.empty:
         raise ValueError("No daily data available")
@@ -33,8 +33,8 @@ def save_daily_chart(ticker="BZ=F", daily_days=20, ma_window=5):
     latest_price = float(daily["Close"].iloc[-1])
     latest_date = pd.to_datetime(daily.index[-1])
 
-    csv_path = BASE_DIR / "crude_daily_data.csv"
-    png_path = BASE_DIR / "crude_daily_daily.png"
+    csv_path = BASE_DIR / f"crude_daily_data_{run_ts}.csv"
+    png_path = BASE_DIR / f"crude_daily_daily_{run_ts}.png"
 
     daily[["Close", "Moving Average"]].to_csv(csv_path, index_label="Date")
 
@@ -60,7 +60,7 @@ def save_daily_chart(ticker="BZ=F", daily_days=20, ma_window=5):
 
     return latest_date, latest_price, csv_path, png_path
 
-def save_intraday_chart(ticker="BZ=F", period="5d", interval="1h", ma_window=5):
+def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_window=5):
     intra = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
     if intra.empty:
         raise ValueError("No intraday data available")
@@ -76,7 +76,7 @@ def save_intraday_chart(ticker="BZ=F", period="5d", interval="1h", ma_window=5):
     intra = intra.tail(20).copy()
     intra["Label"] = pd.to_datetime(intra.index).strftime("%Y-%m-%d %H:%M")
 
-    png_path = BASE_DIR / "crude_daily_intraday.png"
+    png_path = BASE_DIR / f"crude_daily_intraday_{run_ts}.png"
 
     x = range(len(intra))
     fig, ax = plt.subplots(figsize=(16, 7))
@@ -127,13 +127,17 @@ def send_email(subject, body, attachments):
         server.sendmail(sender_email, recipient_email, msg.as_string())
 
 def main():
-    latest_date, latest_price, csv_path, daily_png = save_daily_chart()
-    intra_png = save_intraday_chart()
+    run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    latest_date, latest_price, csv_path, daily_png = save_daily_chart(run_ts)
+    intra_png = save_intraday_chart(run_ts)
     now_text = latest_date.strftime("%Y-%m-%d %H:%M")
     subject = "Brent update"
     body = f"aggiornamento brent / {now_text}"
     send_email(subject, body, [daily_png, intra_png])
     print(f"Sent email with latest close {latest_price:.2f} USD/barrel")
+    print(f"Saved: {csv_path}")
+    print(f"Saved: {daily_png}")
+    print(f"Saved: {intra_png}")
 
 if __name__ == "__main__":
     main()
