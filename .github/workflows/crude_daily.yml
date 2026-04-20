@@ -1,7 +1,5 @@
 name: Crude Daily
 
-name: Crude Daily
-
 on:
   schedule:
     - cron: '*/2 * * * *'
