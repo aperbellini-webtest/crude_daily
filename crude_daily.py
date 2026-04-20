@@ -115,7 +115,7 @@ def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_wi
 def send_email(subject, body, attachments):
     sender_email = os.environ["CRUDE_GMAIL_USER"]
     app_password = os.environ["CRUDE_GMAIL_APP_PASSWORD"]
-    recipient_email = "aperbellini@gmail.com"
+    recipient_email = "accounting@perbellini.info"
 
     msg = MIMEMultipart()
     msg["From"] = sender_email
