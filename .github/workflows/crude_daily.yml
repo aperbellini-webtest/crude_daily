@@ -3,7 +3,6 @@ name: Crude Daily
 on:
   schedule:
     - cron: '*/2 * * * *'
-    # ^ Ogni 2 minuti - TEST TEMPORANEO
   workflow_dispatch:
 
 jobs:
