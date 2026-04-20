@@ -1,0 +1,38 @@
+name: Crude Daily
+
+on:
+  schedule:
+    - cron: '*/2 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
+          CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
+        run: python crude_daily.py
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: crude-daily-outputs
+          path: |
+            *.png
+            *.csv
+          if-no-files-found: error
