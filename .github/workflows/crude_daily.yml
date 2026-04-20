@@ -2,8 +2,8 @@ name: Crude Daily
 
 on:
   schedule:
-  - cron: '25 10 * * *'
-  # ^ 10:25 UTC = 12:25 ora italiana (tra 5 minuti)
+    - cron: '0 5,9,13,17 * * 1-5'
+    # ^ 7:00, 11:00, 15:00, 19:00 ora italiana
   workflow_dispatch:
 
 jobs:
