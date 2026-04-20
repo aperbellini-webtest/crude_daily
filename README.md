@@ -50,3 +50,5 @@ The workflow is in:
 - Weekend runs are disabled.
 - The script sends the latest charts to the configured email address.
 - Outputs are also uploaded as GitHub Actions artifacts.
+
+bacino
