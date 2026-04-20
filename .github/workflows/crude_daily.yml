@@ -3,7 +3,7 @@ name: Crude Daily
 on:
   schedule:
     - cron: '*/5 * * * *'
-    # ^ Ogni 5 minuti - TEST FINALE
+    # ^ Ogni 5 minuti - TEST FINAL
   workflow_dispatch:
 
 jobs:
