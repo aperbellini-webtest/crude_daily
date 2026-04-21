@@ -2,7 +2,7 @@ name: Crude Daily
 
 on:
   schedule:
-    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 ora italiana (lun-ven)
+    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 IT
   workflow_dispatch:
 
 jobs:
@@ -11,63 +11,55 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Debug - Verifica Secrets
+      - name: Debug - Verifica secrets e destinatario
         run: |
-          echo "=== DEBUG SECRETS ==="
-          echo "CRUDE_GMAIL_USER impostato: ${CRUDE_GMAIL_USER:+YES}"
-          echo "CRUDE_GMAIL_USER length: ${#CRUDE_GMAIL_USER}"
-          echo "CRUDE_GMAIL_APP_PASSWORD impostato: ${CRUDE_GMAIL_APP_PASSWORD:+YES}"
-          echo "CRUDE_GMAIL_APP_PASSWORD length: ${#CRUDE_GMAIL_APP_PASSWORD}"
-          
-          if [ -z "$CRUDE_GMAIL_USER" ]; then
-            echo "::error::CRUDE_GMAIL_USER è vuoto o non impostato!"
-            exit 1
-          fi
-          
-          if [ -z "$CRUDE_GMAIL_APP_PASSWORD" ]; then
-            echo "::error::CRUDE_GMAIL_APP_PASSWORD è vuoto o non impostato!"
-            exit 1
-          fi
-          
-          echo "=== SECRETS OK ==="
+          echo "=== CONFIGURAZIONE EMAIL ==="
+          echo "CRUDE_GMAIL_USER: ${CRUDE_GMAIL_USER}"
+          echo "Destinatario nel codice: accounting@perbellini.info"
+          echo "Per test, modifica manualmente il file crude_daily.py se vuoi cambiare destinatario"
+        env:
+          CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
+
+      - name: Test invio email semplice (diagnostico)
         env:
           CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
           CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
-
-      - name: Test - Connessione SMTP
         run: |
-          echo "=== TEST CONNESSIONE SMTP ==="
           python3 -c "
-          import smtplib
-          import ssl
+          import smtplib, ssl
+          sender = '${CRUDE_GMAIL_USER}'
+          pwd = '${CRUDE_GMAIL_APP_PASSWORD}'
+          recipient = 'accounting@perbellini.info'
+          # Test anche a un indirizzo personale se vuoi
+          # recipient = 'tuo.email@gmail.com'
           
-          print('Test connessione a smtp.gmail.com:587...')
+          msg = '''From: {}
+          To: {}
+          Subject: TEST SMTP da GitHub Actions - {}
+          
+          Questo è un test puro. Se leggi questo, l'invio funziona.
+          '''.format(sender, recipient, '2026-04-21')
+          
           context = ssl.create_default_context()
-          
-          try:
-              server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
-              print('✓ Connessione stabilita')
+          with smtplib.SMTP('smtp.gmail.com', 587) as server:
               server.starttls(context=context)
-              print('✓ TLS avviato')
-              server.quit()
-              print('✓ Test SMTP completato con successo')
-          except Exception as e:
-              print(f'✗ Errore SMTP: {e}')
-              exit(1)
+              server.login(sender, pwd)
+              server.sendmail(sender, recipient, msg)
+          print('Test email inviata a', recipient)
           "
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run script
+      - name: Run script principale
         env:
           CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
           CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
