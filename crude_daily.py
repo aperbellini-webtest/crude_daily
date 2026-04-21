@@ -7,6 +7,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+import time
+import random
 
 import yfinance as yf
 import pandas as pd
@@ -155,7 +157,7 @@ def send_email(subject, body, attachments):
     
     sender_email = os.environ["CRUDE_GMAIL_USER"]
     app_password = os.environ["CRUDE_GMAIL_APP_PASSWORD"]
-    recipient_email = "accounting@perbellini.info"
+    recipient_email = "accounting@perbellini.info"  # ← Modifica se necessario
     
     logging.info(f"Sender: {sender_email}")
     logging.info(f"Recipient: {recipient_email}")
@@ -165,6 +167,11 @@ def send_email(subject, body, attachments):
     msg["From"] = sender_email
     msg["To"] = recipient_email
     msg["Subject"] = subject
+    
+    # Header per migliorare deliverability
+    msg["Reply-To"] = sender_email
+    msg["Message-ID"] = f"<crude.{int(time.time())}.{random.randint(1000,9999)}@{sender_email.split('@')[-1]}>"
+    
     msg.attach(MIMEText(body, "plain"))
 
     for file_path in attachments:
@@ -261,6 +268,7 @@ Buona giornata!"""
     except Exception as e:
         logging.error(f"ERRORE FATALE: {str(e)}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
