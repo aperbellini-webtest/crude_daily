@@ -155,7 +155,7 @@ def send_email(subject, body, attachments):
     
     sender_email = os.environ["CRUDE_GMAIL_USER"]
     app_password = os.environ["CRUDE_GMAIL_APP_PASSWORD"]
-    recipient_email = "aperbellini@gmail.com"
+    recipient_email = "accounting@perbellini.info"
     
     logging.info(f"Sender: {sender_email}")
     logging.info(f"Recipient: {recipient_email}")
