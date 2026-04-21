@@ -19,30 +19,39 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Debug - Verifica configurazione
+      - name: Debug - Verifica configurazione SendGrid
         run: |
-          echo "=== CONFIGURAZIONE EMAIL ==="
-          echo "CRUDE_GMAIL_USER impostato: ${CRUDE_GMAIL_USER:+YES}"
-          echo "Destinatario: accounting@perbellini.info"
+          echo "=== CONFIGURAZIONE SENDGRID ==="
+          echo "SENDGRID_API_KEY impostato: ${SENDGRID_API_KEY:+YES}"
+          echo "Sender email: aperbellini@gmail.com (deve essere verificata in SendGrid)"
+          echo "Recipient: accounting@perbellini.info"
         env:
-          CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
 
-      - name: Test SMTP connessione
+      - name: Test SMTP SendGrid
         env:
-          CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
-          CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
           python3 -c "
-          import smtplib, ssl
-          sender = '${CRUDE_GMAIL_USER}'
-          pwd = '${CRUDE_GMAIL_APP_PASSWORD}'
+          import smtplib, ssl, os
+          
+          sender = 'aperbellini@gmail.com'  # ← Deve essere verificata in SendGrid
+          api_key = os.environ['SENDGRID_API_KEY']
           recipient = 'accounting@perbellini.info'
           
+          msg = f'''From: {sender}
+          To: {recipient}
+          Subject: TEST SENDGRID da GitHub Actions
+          
+          Se leggi questo, SendGrid funziona!
+          '''
+          
           context = ssl.create_default_context()
-          with smtplib.SMTP('smtp.gmail.com', 587) as server:
+          with smtplib.SMTP('smtp.sendgrid.net', 587) as server:
               server.starttls(context=context)
-              server.login(sender, pwd)
-          print('✓ Connessione SMTP OK')
+              server.login('apikey', api_key)
+              server.sendmail(sender, recipient, msg)
+          print('✅ Test SendGrid OK')
           "
 
       - name: Install dependencies
@@ -50,8 +59,7 @@ jobs:
 
       - name: Run script principale
         env:
-          CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
-          CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: python crude_daily.py
 
       - name: Upload outputs (grafici e CSV)
