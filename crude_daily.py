@@ -56,7 +56,8 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     history_csv_path = BASE_DIR / "crude_daily_history.csv"
     png_path = BASE_DIR / f"crude_daily_daily_{run_ts}.png"
 
-    daily_export = daily.reset_index()[["Date", "Close", "Moving Average"]].copy()
+    # CSV EXPORT DETTAGLIATO con tutte le colonne
+    daily_export = daily.reset_index().copy()
     daily_export["RunTimestamp"] = run_ts
     daily_export["Ticker"] = ticker
 
@@ -67,10 +68,11 @@ def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
     else:
         combined = daily_export
 
+    # Salva CSV con tutte le colonne: Date, Open, High, Low, Close, Volume, Dividends, Stock Splits, MA5
     combined.to_csv(history_csv_path, index=False)
     logging.info(f"CSV storico salvato: {history_csv_path}")
 
-    # CREAZIONE GRAFICO - CODICE ORIGINALE
+    # CREAZIONE GRAFICO - CODICE ORIGINALE PERFETTO
     x = range(len(daily))
     fig, ax = plt.subplots(figsize=(15, 7))
     bars = ax.bar(x, daily["Close"], color="#4C78A8", width=0.75, label="Daily Close")
@@ -119,7 +121,7 @@ def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_wi
 
     png_path = BASE_DIR / f"crude_daily_intraday_{run_ts}.png"
 
-    # CREAZIONE GRAFICO - CODICE ORIGINALE
+    # CREAZIONE GRAFICO - CODICE ORIGINALE PERFETTO
     x = range(len(intra))
     fig, ax = plt.subplots(figsize=(16, 7))
     bars = ax.bar(x, intra["Close"], color="#F28E2B", width=0.7, label="Close")
@@ -223,11 +225,27 @@ def main():
         intra_png = save_intraday_chart(run_ts)
         
         logging.info("Step 3: Preparazione email...")
-        now_text = latest_date.strftime("%Y-%m-%d %H:%M")
-        body = f"aggiornamento brent / {now_text}"
+        
+        # OGGETTO EMAIL con timestamp formattato
+        timestamp_subject = latest_date.strftime("%Y-%m-%d %H:%M")
+        subject = f"Brent Crude Oil Update - {timestamp_subject}"
+        
+        # BODY EMAIL formattato con emoji e bullet points
+        body = f"""Ciao,
+
+Ecco l'aggiornamento sul prezzo del Brent Crude Oil:
+
+📊 Ultimo prezzo di chiusura: {latest_price:.2f} USD/barrel
+
+In allegato trovi:
+- Grafico daily (ultimi 20 giorni)
+- Grafico intraday (oggi)
+- Dati storici in formato CSV
+
+Buona giornata!"""
         
         logging.info("Step 4: Invio email...")
-        send_email("Brent update", body, [daily_png, intra_png, history_csv])
+        send_email(subject, body, [daily_png, intra_png, history_csv])
         
         logging.info("========================================")
         logging.info("ESECUZIONE COMPLETATA CON SUCCESSO")
