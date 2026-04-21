@@ -152,13 +152,11 @@ def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_wi
 
 
 def send_email(subject, body, attachments):
-    """Invia email con allegati via SendGrid SMTP"""
-    logging.info("=== INIZIO send_email (SendGrid) ===")
+    """Invia email con allegati via SMTP Gmail"""
+    logging.info("=== INIZIO send_email ===")
     
-    # Configurazione SendGrid
-    sendgrid_user = "apikey"  # Username fisso per SendGrid
-    sendgrid_api_key = os.environ["SENDGRID_API_KEY"]
-    sender_email = "aperbellini@gmail.com"  # ← DEVE essere un'email verificata in SendGrid
+    sender_email = os.environ["CRUDE_GMAIL_USER"]
+    app_password = os.environ["CRUDE_GMAIL_APP_PASSWORD"]
     recipient_email = "accounting@perbellini.info"  # ← Modifica se necessario
     
     logging.info(f"Sender: {sender_email}")
@@ -172,7 +170,7 @@ def send_email(subject, body, attachments):
     
     # Header per migliorare deliverability
     msg["Reply-To"] = sender_email
-    msg["Message-ID"] = f"<crude.{int(time.time())}.{random.randint(1000,9999)}@sendgrid.net>"
+    msg["Message-ID"] = f"<crude.{int(time.time())}.{random.randint(1000,9999)}@{sender_email.split('@')[-1]}>"
     
     msg.attach(MIMEText(body, "plain"))
 
@@ -186,32 +184,29 @@ def send_email(subject, body, attachments):
         msg.attach(part)
         logging.info(f"File allegato: {Path(file_path).name}")
 
-    # Connessione a SendGrid SMTP
-    logging.info("Connessione a smtp.sendgrid.net:587...")
+    logging.info("Connessione a smtp.gmail.com:587...")
     context = ssl.create_default_context()
     
     try:
-        with smtplib.SMTP("smtp.sendgrid.net", 587) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
             logging.info("Connessione SMTP stabilita")
             server.starttls(context=context)
             logging.info("TLS avviato")
             
-            # Login con API key
-            server.login(sendgrid_user, sendgrid_api_key)
-            logging.info("Login SendGrid riuscito")
+            server.login(sender_email, app_password)
+            logging.info("Login SMTP riuscito")
             
             server.sendmail(sender_email, recipient_email, msg.as_string())
-            logging.info("Email inviata con successo via SendGrid!")
+            logging.info("Email inviata con successo!")
             
             server.quit()
             logging.info("Connessione SMTP chiusa")
             
     except smtplib.SMTPAuthenticationError as e:
-        logging.error(f"Errore autenticazione SendGrid: {str(e)}")
-        logging.error("Verifica che SENDGRID_API_KEY sia corretta e che l'email mittente sia verificata in SendGrid")
+        logging.error(f"Errore autenticazione SMTP: {str(e)}")
         raise
     except smtplib.SMTPException as e:
-        logging.error(f"Errore SMTP SendGrid: {str(e)}")
+        logging.error(f"Errore SMTP: {str(e)}")
         raise
     except Exception as e:
         logging.error(f"Errore invio email: {str(e)}")
@@ -241,7 +236,7 @@ def main():
         
         logging.info("Step 3: Preparazione email...")
         
-        # OGGETTO EMAIL con orario corrente
+        # OGGETTO EMAIL con orario corrente (non latest_date)
         timestamp_subject = now.strftime("%Y-%m-%d %H:%M")
         subject = f"Brent Crude Oil Update - {timestamp_subject}"
         
@@ -259,7 +254,7 @@ In allegato trovi:
 
 Buona giornata!"""
         
-        logging.info("Step 4: Invio email via SendGrid...")
+        logging.info("Step 4: Invio email...")
         send_email(subject, body, [daily_png, intra_png, history_csv])
         
         logging.info("========================================")
