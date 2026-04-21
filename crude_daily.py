@@ -19,8 +19,9 @@ logging.basicConfig(
     ]
 )
 
+
 def save_daily_chart():
-    """Scarica dati daily e crea grafico"""
+    """Scarica dati daily e crea grafico con istogrammi e moving average"""
     logging.info("=== INIZIO save_daily_chart ===")
     
     # Scarica dati Brent Crude Oil
@@ -31,26 +32,60 @@ def save_daily_chart():
     hist = ticker.history(period="1mo")
     hist = hist.tail(20)
     
+    # Calcola moving average a 5 giorni
+    hist['MA5'] = hist['Close'].rolling(window=5).mean()
+    
     # Salva CSV
     csv_file = "crude_daily_history.csv"
     hist.to_csv(csv_file)
     logging.info(f"CSV salvato: {csv_file}")
     
     # Crea grafico
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(hist.index, hist['Close'], linewidth=2, color='blue', label='Close Price')
-    ax.set_title('Brent Crude Oil - Daily Close Price (Last 20 days)', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Date', fontsize=12)
-    ax.set_ylabel('Price (USD/barrel)', fontsize=12)
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    plt.xticks(rotation=45)
+    fig, ax = plt.subplots(figsize=(14, 7))
+    
+    # Istogrammi per i prezzi daily
+    bars = ax.bar(hist.index, hist['Close'], color='#4682B4', label='Daily Close', width=0.8)
+    
+    # Linea per moving average
+    ax.plot(hist.index, hist['MA5'], color='#FF8C00', linewidth=2.5, marker='o', 
+            markersize=6, label='5-Day Moving Average')
+    
+    # Aggiungi valori sopra le barre
+    for bar in bars:
+        height = bar.get_height()
+        ax.annotate(f'${height:.2f}',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom',
+                    fontsize=8, fontweight='bold')
+    
+    # Aggiungi valori sulla linea del moving average
+    for i, (idx, row) in enumerate(hist.iterrows()):
+        if pd.notna(row['MA5']):
+            ax.annotate(f'${row["MA5"]:.2f}',
+                        xy=(idx, row['MA5']),
+                        xytext=(0, -12),
+                        textcoords="offset points",
+                        ha='center', va='top',
+                        fontsize=7, color='#FF8C00', fontweight='bold')
+    
+    # Formattazione grafico
+    ax.set_title('Brent Crude Oil - Last 20 Daily Quotes with Moving Average', 
+                 fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('Date', fontsize=12, fontweight='bold')
+    ax.set_ylabel('USD per barrel', fontsize=12, fontweight='bold')
+    ax.legend(loc='upper right', fontsize=10, framealpha=0.9)
+    ax.grid(True, axis='y', alpha=0.3, linestyle='--')
+    
+    # Ruota le date sull'asse x
+    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     
     # Salva PNG con timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     daily_png = f"crude_daily_daily_{timestamp}.png"
-    plt.savefig(daily_png, dpi=300)
+    plt.savefig(daily_png, dpi=300, bbox_inches='tight')
     plt.close()
     logging.info(f"Grafico daily salvato: {daily_png}")
     
@@ -58,7 +93,7 @@ def save_daily_chart():
 
 
 def save_intraday_chart():
-    """Crea grafico intraday con ultime quotazioni"""
+    """Crea grafico intraday con istogrammi e moving average"""
     logging.info("=== INIZIO save_intraday_chart ===")
     
     # Scarica dati intraday (1 giorno, intervallo 1h)
@@ -68,7 +103,7 @@ def save_intraday_chart():
     if hist.empty:
         logging.warning("Nessun dato intraday disponibile")
         # Crea grafico vuoto con messaggio
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(14, 7))
         ax.text(0.5, 0.5, 'No intraday data available', 
                 horizontalalignment='center', verticalalignment='center',
                 transform=ax.transAxes, fontsize=14)
@@ -76,22 +111,55 @@ def save_intraday_chart():
         ax.set_ylim(0, 1)
         ax.axis('off')
     else:
-        logging.info(f"Dati intraday scaricati: {len(hist)} righe")
+        # Calcola moving average a 5 periodi
+        hist['MA5'] = hist['Close'].rolling(window=5).mean()
+        
         # Crea grafico
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(hist.index, hist['Close'], linewidth=2, color='red', label='Intraday Price')
-        ax.set_title('Brent Crude Oil - Intraday Price (Today)', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Time', fontsize=12)
-        ax.set_ylabel('Price (USD/barrel)', fontsize=12)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        plt.xticks(rotation=45)
+        fig, ax = plt.subplots(figsize=(14, 7))
+        
+        # Istogrammi per i prezzi intraday
+        bars = ax.bar(hist.index, hist['Close'], color='#FF8C00', label='Close', width=0.8)
+        
+        # Linea per moving average
+        ax.plot(hist.index, hist['MA5'], color='#4682B4', linewidth=2.5, marker='o', 
+                markersize=6, label='5-Period Moving Average')
+        
+        # Aggiungi valori sopra le barre
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(f'${height:.2f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom',
+                        fontsize=8, fontweight='bold')
+        
+        # Aggiungi valori sulla linea del moving average
+        for i, (idx, row) in enumerate(hist.iterrows()):
+            if pd.notna(row['MA5']):
+                ax.annotate(f'${row["MA5"]:.2f}',
+                            xy=(idx, row['MA5']),
+                            xytext=(0, -12),
+                            textcoords="offset points",
+                            ha='center', va='top',
+                            fontsize=7, color='#4682B4', fontweight='bold')
+        
+        # Formattazione grafico
+        ax.set_title('Brent Crude Oil - Intraday Quotes with Moving Average', 
+                     fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('Date and Time', fontsize=12, fontweight='bold')
+        ax.set_ylabel('USD per barrel', fontsize=12, fontweight='bold')
+        ax.legend(loc='lower left', fontsize=10, framealpha=0.9)
+        ax.grid(True, axis='y', alpha=0.3, linestyle='--')
+        
+        # Ruota le date sull'asse x
+        plt.xticks(rotation=45, ha='right')
         plt.tight_layout()
     
     # Salva PNG con timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     intra_png = f"crude_daily_intraday_{timestamp}.png"
-    plt.savefig(intra_png, dpi=300)
+    plt.savefig(intra_png, dpi=300, bbox_inches='tight')
     plt.close()
     logging.info(f"Grafico intraday salvato: {intra_png}")
     
