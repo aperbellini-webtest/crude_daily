@@ -2,7 +2,7 @@ name: Crude Daily
 
 on:
   schedule:
-    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 IT
+    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 ora italiana (lun-ven)
   workflow_dispatch:
 
 jobs:
@@ -11,24 +11,23 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Debug - Verifica secrets e destinatario
+      - name: Debug - Verifica configurazione
         run: |
           echo "=== CONFIGURAZIONE EMAIL ==="
-          echo "CRUDE_GMAIL_USER: ${CRUDE_GMAIL_USER}"
-          echo "Destinatario nel codice: accounting@perbellini.info"
-          echo "Per test, modifica manualmente il file crude_daily.py se vuoi cambiare destinatario"
+          echo "CRUDE_GMAIL_USER impostato: ${CRUDE_GMAIL_USER:+YES}"
+          echo "Destinatario: accounting@perbellini.info"
         env:
           CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
 
-      - name: Test invio email semplice (diagnostico)
+      - name: Test SMTP connessione
         env:
           CRUDE_GMAIL_USER: ${{ secrets.CRUDE_GMAIL_USER }}
           CRUDE_GMAIL_APP_PASSWORD: ${{ secrets.CRUDE_GMAIL_APP_PASSWORD }}
@@ -38,22 +37,12 @@ jobs:
           sender = '${CRUDE_GMAIL_USER}'
           pwd = '${CRUDE_GMAIL_APP_PASSWORD}'
           recipient = 'accounting@perbellini.info'
-          # Test anche a un indirizzo personale se vuoi
-          # recipient = 'tuo.email@gmail.com'
-          
-          msg = '''From: {}
-          To: {}
-          Subject: TEST SMTP da GitHub Actions - {}
-          
-          Questo è un test puro. Se leggi questo, l'invio funziona.
-          '''.format(sender, recipient, '2026-04-21')
           
           context = ssl.create_default_context()
           with smtplib.SMTP('smtp.gmail.com', 587) as server:
               server.starttls(context=context)
               server.login(sender, pwd)
-              server.sendmail(sender, recipient, msg)
-          print('Test email inviata a', recipient)
+          print('✓ Connessione SMTP OK')
           "
 
       - name: Install dependencies
