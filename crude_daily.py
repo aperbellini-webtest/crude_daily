@@ -1,153 +1,232 @@
-import os
-import smtplib
-import ssl
-from datetime import datetime
-from pathlib import Path
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
+import smtplib
+import ssl
+import os
+import sys
+from email.message import EmailMessage
+from datetime import datetime
+import logging
 
-BASE_DIR = Path.cwd()
+# Configurazione logging dettagliato
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('/tmp/crude_debug.log')
+    ]
+)
 
-def save_daily_chart(run_ts, ticker="BZ=F", daily_days=20, ma_window=5):
-    daily = yf.download(ticker, period="3mo", interval="1d", progress=False, auto_adjust=False)
-    if daily.empty:
-        raise ValueError("No daily data available")
+def save_daily_chart():
+    """Scarica dati daily e crea grafico"""
+    logging.info("=== INIZIO save_daily_chart ===")
+    
+    # Scarica dati Brent Crude Oil
+    logging.info("Download dati da Yahoo Finance...")
+    ticker = yf.Ticker("BZ=F")
+    
+    # Ultimi 20 giorni di trading
+    hist = ticker.history(period="1mo")
+    hist = hist.tail(20)
+    
+    # Salva CSV
+    csv_file = "crude_daily_history.csv"
+    hist.to_csv(csv_file)
+    logging.info(f"CSV salvato: {csv_file}")
+    
+    # Crea grafico
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(hist.index, hist['Close'], linewidth=2, color='blue', label='Close Price')
+    ax.set_title('Brent Crude Oil - Daily Close Price (Last 20 days)', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Date', fontsize=12)
+    ax.set_ylabel('Price (USD/barrel)', fontsize=12)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    # Salva PNG con timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    daily_png = f"crude_daily_daily_{timestamp}.png"
+    plt.savefig(daily_png, dpi=300)
+    plt.close()
+    logging.info(f"Grafico daily salvato: {daily_png}")
+    
+    return hist, csv_file, daily_png
 
-    if isinstance(daily.columns, pd.MultiIndex):
-        daily.columns = daily.columns.get_level_values(0)
 
-    daily = daily.dropna().copy()
-    if isinstance(daily["Close"], pd.DataFrame):
-        daily["Close"] = daily["Close"].iloc[:, 0]
-
-    daily = daily.tail(daily_days).copy()
-    daily["Moving Average"] = daily["Close"].rolling(ma_window).mean()
-    daily["Label"] = pd.to_datetime(daily.index).strftime("%Y-%m-%d")
-
-    latest_price = float(daily["Close"].iloc[-1])
-    latest_date = pd.to_datetime(daily.index[-1])
-
-    history_csv_path = BASE_DIR / "crude_daily_history.csv"
-    png_path = BASE_DIR / f"crude_daily_daily_{run_ts}.png"
-
-    daily_export = daily.reset_index()[["Date", "Close", "Moving Average"]].copy()
-    daily_export["RunTimestamp"] = run_ts
-    daily_export["Ticker"] = ticker
-
-    if history_csv_path.exists():
-        old_history = pd.read_csv(history_csv_path)
-        combined = pd.concat([old_history, daily_export], ignore_index=True)
-        combined = combined.drop_duplicates(subset=["Date", "Ticker"], keep="last").sort_values("Date")
+def save_intraday_chart():
+    """Crea grafico intraday con ultime quotazioni"""
+    logging.info("=== INIZIO save_intraday_chart ===")
+    
+    # Scarica dati intraday (1 giorno, intervallo 1h)
+    ticker = yf.Ticker("BZ=F")
+    hist = ticker.history(period="1d", interval="1h")
+    
+    if hist.empty:
+        logging.warning("Nessun dato intraday disponibile")
+        # Crea grafico vuoto con messaggio
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.text(0.5, 0.5, 'No intraday data available', 
+                horizontalalignment='center', verticalalignment='center',
+                transform=ax.transAxes, fontsize=14)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
     else:
-        combined = daily_export
+        logging.info(f"Dati intraday scaricati: {len(hist)} righe")
+        # Crea grafico
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(hist.index, hist['Close'], linewidth=2, color='red', label='Intraday Price')
+        ax.set_title('Brent Crude Oil - Intraday Price (Today)', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Time', fontsize=12)
+        ax.set_ylabel('Price (USD/barrel)', fontsize=12)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+    
+    # Salva PNG con timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    intra_png = f"crude_daily_intraday_{timestamp}.png"
+    plt.savefig(intra_png, dpi=300)
+    plt.close()
+    logging.info(f"Grafico intraday salvato: {intra_png}")
+    
+    return intra_png
 
-    combined.to_csv(history_csv_path, index=False)
-
-    x = range(len(daily))
-    fig, ax = plt.subplots(figsize=(15, 7))
-    bars = ax.bar(x, daily["Close"], color="#4C78A8", width=0.75, label="Daily Close")
-    ax.plot(x, daily["Moving Average"], color="#F58518", marker="o", linewidth=2.5, label=f"{ma_window}-Day Moving Average")
-
-    offset = daily["Close"].max() * 0.01
-    for i, (bar, val) in enumerate(zip(bars, daily["Close"])):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + offset, f"${val:.2f}", ha="center", va="bottom", fontsize=8)
-
-    ax.set_title(f"Brent Crude Oil - Last {daily_days} Daily Quotes with Moving Average", fontsize=16, weight="bold")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("USD per barrel")
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(daily["Label"], rotation=45, ha="right")
-    ax.grid(axis="y", alpha=0.25)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-
-    return latest_date, latest_price, history_csv_path, png_path
-
-def save_intraday_chart(run_ts, ticker="BZ=F", period="5d", interval="1h", ma_window=5):
-    intra = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=False)
-    if intra.empty:
-        raise ValueError("No intraday data available")
-
-    if isinstance(intra.columns, pd.MultiIndex):
-        intra.columns = intra.columns.get_level_values(0)
-
-    intra = intra.dropna().copy()
-    if isinstance(intra["Close"], pd.DataFrame):
-        intra["Close"] = intra["Close"].iloc[:, 0]
-
-    intra["Moving Average"] = intra["Close"].rolling(ma_window).mean()
-    intra = intra.tail(20).copy()
-    intra["Label"] = pd.to_datetime(intra.index).strftime("%Y-%m-%d %H:%M")
-
-    png_path = BASE_DIR / f"crude_daily_intraday_{run_ts}.png"
-
-    x = range(len(intra))
-    fig, ax = plt.subplots(figsize=(16, 7))
-    bars = ax.bar(x, intra["Close"], color="#F28E2B", width=0.7, label="Close")
-    ax.plot(x, intra["Moving Average"], color="#1F77B4", marker="o", linewidth=2.5, label=f"{ma_window}-Period Moving Average")
-
-    offset = intra["Close"].max() * 0.01
-    for i, (bar, val) in enumerate(zip(bars, intra["Close"])):
-        ts = pd.to_datetime(intra.index[i])
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + offset, f"${val:.2f}\n{ts.strftime('%H:%M')}", ha="center", va="bottom", fontsize=8)
-
-    ax.set_title("Brent Crude Oil - Intraday Quotes with Moving Average", fontsize=16, weight="bold")
-    ax.set_xlabel("Date and Time")
-    ax.set_ylabel("USD per barrel")
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(intra["Label"], rotation=45, ha="right")
-    ax.grid(axis="y", alpha=0.25)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(png_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-
-    return png_path
 
 def send_email(subject, body, attachments):
-    sender_email = os.environ["CRUDE_GMAIL_USER"]
-    app_password = os.environ["CRUDE_GMAIL_APP_PASSWORD"]
-    recipient_email = "accounting@perbellini.info"
-
-    msg = MIMEMultipart()
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    for file_path in attachments:
-        with open(file_path, "rb") as f:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f'attachment; filename="{Path(file_path).name}"')
-        msg.attach(part)
-
+    """Invia email con allegati via SMTP Gmail"""
+    logging.info("=== INIZIO send_email ===")
+    
+    # Recupera credenziali dalle variabili d'ambiente
+    sender_email = os.environ.get('CRUDE_GMAIL_USER')
+    app_password = os.environ.get('CRUDE_GMAIL_APP_PASSWORD')
+    recipient_email = "aperbellini@gmail.com"
+    
+    # Debug: verifica che le secrets esistano
+    logging.info(f"Sender email configurata: {sender_email[:3] if sender_email else 'NONE'}***")
+    logging.info(f"Password length: {len(app_password) if app_password else 0} caratteri")
+    logging.info(f"Recipient: {recipient_email}")
+    
+    if not sender_email or not app_password:
+        logging.error("ERRORE CRITICO: CRUDE_GMAIL_USER o CRUDE_GMAIL_APP_PASSWORD non sono impostate!")
+        raise ValueError("Mancano le credenziali email nelle environment variables")
+    
+    # Crea messaggio email
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg.set_content(body)
+    
+    # Aggiungi allegati
+    for attachment in attachments:
+        try:
+            logging.info(f"Allego file: {attachment}")
+            with open(attachment, 'rb') as f:
+                file_data = f.read()
+                file_name = os.path.basename(attachment)
+            
+            # Determina il tipo di file
+            if attachment.endswith('.png'):
+                msg.add_attachment(file_data, maintype='image', subtype='png', filename=file_name)
+            elif attachment.endswith('.csv'):
+                msg.add_attachment(file_data, maintype='text', subtype='csv', filename=file_name)
+            else:
+                msg.add_attachment(file_data, maintype='application', subtype='octet-stream', filename=file_name)
+            
+            logging.info(f"File {file_name} allegato con successo")
+        except Exception as e:
+            logging.error(f"Errore nell'allegare {attachment}: {str(e)}")
+            raise
+    
+    # Invia email via SMTP
+    logging.info("Connessione a smtp.gmail.com:587...")
     context = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls(context=context)
-        server.login(sender_email, app_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
+    
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            logging.info("Connessione SMTP stabilita")
+            server.starttls(context=context)
+            logging.info("TLS avviato")
+            
+            server.login(sender_email, app_password)
+            logging.info("Login SMTP riuscito")
+            
+            # Invia email
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+            logging.info("Email inviata con successo!")
+            
+            server.quit()
+            logging.info("Connessione SMTP chiusa")
+            
+    except smtplib.SMTPAuthenticationError as e:
+        logging.error(f"Errore di autenticazione SMTP: {str(e)}")
+        logging.error("Verifica che CRUDE_GMAIL_APP_PASSWORD sia corretta (deve essere una App Password, non la password normale)")
+        raise
+    except smtplib.SMTPException as e:
+        logging.error(f"Errore SMTP durante l'invio: {str(e)}")
+        raise
+    except Exception as e:
+        logging.error(f"Errore generico durante l'invio email: {str(e)}")
+        raise
+    
+    logging.info("=== FINE send_email ===")
+
 
 def main():
-    run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    latest_date, latest_price, history_csv, daily_png = save_daily_chart(run_ts)
-    intra_png = save_intraday_chart(run_ts)
-    now_text = latest_date.strftime("%Y-%m-%d %H:%M")
-    body = f"aggiornamento brent / {now_text}"
-    send_email("Brent update", body, [daily_png, intra_png, history_csv])
-    print(f"Sent email with latest close {latest_price:.2f} USD/barrel")
-    print(f"Saved: {history_csv}")
-    print(f"Saved: {daily_png}")
-    print(f"Saved: {intra_png}")
+    """Funzione principale"""
+    logging.info("========================================")
+    logging.info("INIZIO ESECUZIONE crude_daily.py")
+    logging.info(f"Timestamp: {datetime.now().isoformat()}")
+    logging.info("========================================")
+    
+    try:
+        # 1. Scarica dati e crea grafico daily
+        logging.info("Step 1: Generazione grafico daily...")
+        hist, history_csv, daily_png = save_daily_chart()
+        latest_price = hist['Close'].iloc[-1]
+        logging.info(f"Ultimo prezzo closing: {latest_price:.2f} USD/barrel")
+        
+        # 2. Crea grafico intraday
+        logging.info("Step 2: Generazione grafico intraday...")
+        intra_png = save_intraday_chart()
+        
+        # 3. Prepara email
+        logging.info("Step 3: Preparazione email...")
+        subject = f"Brent Crude Oil Update - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        body = f"""
+Ciao,
+
+Ecco l'aggiornamento sul prezzo del Brent Crude Oil:
+
+📊 Ultimo prezzo di chiusura: {latest_price:.2f} USD/barrel
+
+In allegato trovi:
+- Grafico daily (ultimi 20 giorni)
+- Grafico intraday (oggi)
+- Dati storici in formato CSV
+
+Buona giornata!
+        """
+        
+        # 4. Invia email
+        logging.info("Step 4: Invio email...")
+        attachments = [history_csv, daily_png, intra_png]
+        send_email(subject, body, attachments)
+        
+        logging.info("========================================")
+        logging.info("ESECUZIONE COMPLETATA CON SUCCESSO")
+        logging.info("========================================")
+        
+    except Exception as e:
+        logging.error(f"ERRORE FATALE durante l'esecuzione: {str(e)}", exc_info=True)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
