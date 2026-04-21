@@ -218,6 +218,9 @@ def main():
     try:
         run_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
+        # ORA CORRENTE per l'oggetto della mail
+        now = datetime.now()
+        
         logging.info("Step 1: Generazione grafico daily...")
         latest_date, latest_price, history_csv, daily_png = save_daily_chart(run_ts)
         
@@ -226,8 +229,8 @@ def main():
         
         logging.info("Step 3: Preparazione email...")
         
-        # OGGETTO EMAIL con timestamp formattato
-        timestamp_subject = latest_date.strftime("%Y-%m-%d %H:%M")
+        # OGGETTO EMAIL con orario corrente (non latest_date)
+        timestamp_subject = now.strftime("%Y-%m-%d %H:%M")
         subject = f"Brent Crude Oil Update - {timestamp_subject}"
         
         # BODY EMAIL formattato con emoji e bullet points
@@ -258,7 +261,6 @@ Buona giornata!"""
     except Exception as e:
         logging.error(f"ERRORE FATALE: {str(e)}", exc_info=True)
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
