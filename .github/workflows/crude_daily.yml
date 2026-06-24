@@ -2,7 +2,7 @@ name: Crude Daily
 
 on:
   schedule:
-    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 ora italiana (lun-ven)
+    - cron: '0 5,9,13,17 * * 1-5'  # 07:00, 11:00, 15:00, 19:00 ora italiana (lun_ven)
   workflow_dispatch:
 
 jobs:
