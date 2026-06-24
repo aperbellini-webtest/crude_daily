@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import logging
 import sys
 
-# Configurazione logging dettagliato
+# Configurazione logging dettagliato al meglio
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
