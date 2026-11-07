@@ -30,7 +30,7 @@ Each run creates files like:
 
 - Python 3.11+
 - GitHub Actions
-- Gmail App Password for SMTP email sending
+- Gmail App Password for SMTP email sending 
 
 ## GitHub secrets
 
